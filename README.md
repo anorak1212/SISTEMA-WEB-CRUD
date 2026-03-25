@@ -524,9 +524,9 @@ docker network connect red_bd web_sysstore
 ---
 
 ## 👤 Integrantes del Equipo
-** Uri Martinez Flores **
-** Mateo Jimenez Perez **
-** Aalan Kalid Ruíz Colín **
+**Uri Martinez Flores**
+**Mateo Jimenez Perez**
+**Aalan Kalid Ruíz Colín**
 
 
 ---
