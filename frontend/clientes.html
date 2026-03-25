@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SysStore — Clientes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav class="sidebar" id="sidebar"></nav>
+
+<main class="content">
+
+    <header class="page-header">
+        <div>
+            <h1 class="page-title">Clientes</h1>
+            <p class="page-sub" id="subCount">Cargando…</p>
+        </div>
+        <button class="btn btn-primary" id="btnNuevo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Nuevo cliente
+        </button>
+    </header>
+
+    <!-- Formulario -->
+    <div class="card" id="formCard" style="display:none;">
+        <div class="card-header">
+            <span class="card-title" id="formTitle">Nuevo cliente</span>
+        </div>
+        <div class="form-grid">
+            <input type="hidden" id="cliId" />
+            <div class="form-group">
+                <label class="form-label">Nombre completo *</label>
+                <input class="form-control" type="text" id="cliName" placeholder="Ej: Ana García López" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Correo electrónico *</label>
+                <input class="form-control" type="email" id="cliEmail" placeholder="correo@ejemplo.com" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Teléfono</label>
+                <input class="form-control" type="tel" id="cliPhone" placeholder="722-100-0000" />
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" id="btnGuardar">💾 Guardar</button>
+            <button class="btn btn-ghost"   id="btnCancelar">✖ Cancelar</button>
+        </div>
+    </div>
+
+    <!-- Tabla -->
+    <div class="card">
+        <div class="filters-bar">
+            <input class="form-control filter-search" type="text" id="searchInput" placeholder="Buscar por nombre o correo…" />
+        </div>
+        <div class="table-wrap">
+            <table class="table">
+                <thead><tr>
+                    <th>Nombre</th><th>Correo</th><th>Teléfono</th>
+                    <th>Fecha alta</th><th>Acciones</th>
+                </tr></thead>
+                <tbody id="tbodyCli"></tbody>
+            </table>
+        </div>
+    </div>
+
+</main>
+
+<script src="shared.js"></script>
+<script>
+requireAuth();
+injectNav('clientes');
+
+let allClients = [];
+
+async function loadClients() {
+    const r = await fetch(`${API}/clients`);
+    allClients = await r.json();
+    renderTable(allClients);
+    document.getElementById('subCount').textContent =
+        `${allClients.length} cliente${allClients.length !== 1 ? 's' : ''} registrado${allClients.length !== 1 ? 's' : ''}`;
+}
+
+function renderTable(data) {
+    const tbody = document.getElementById('tbodyCli');
+    if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="empty-state">No hay clientes registrados.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = data.map(c => `
+        <tr>
+            <td class="td-nombre">${esc(c.name)}</td>
+            <td class="td-muted">${esc(c.email)}</td>
+            <td class="td-muted">${esc(c.phone || '—')}</td>
+            <td class="td-muted">${fmtDate(c.registered_at)}</td>
+            <td class="row-actions">
+                <button class="btn-row btn-row--edit" onclick="editarCli('${c.id}')">Editar</button>
+                <button class="btn-row btn-row--del"  onclick="eliminarCli('${c.id}', '${esc(c.name)}')">Eliminar</button>
+            </td>
+        </tr>`).join('');
+}
+
+document.getElementById('searchInput').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    renderTable(allClients.filter(c =>
+        c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
+    ));
+});
+
+function showForm(titulo) {
+    document.getElementById('formCard').style.display = 'block';
+    document.getElementById('formTitle').textContent = titulo;
+    document.getElementById('formCard').scrollIntoView({ behavior: 'smooth' });
+}
+function hideForm() {
+    document.getElementById('formCard').style.display = 'none';
+    ['cliId','cliName','cliEmail','cliPhone'].forEach(id => document.getElementById(id).value = '');
+}
+
+document.getElementById('btnNuevo').addEventListener('click', () => {
+    hideForm();
+    showForm('Nuevo cliente');
+});
+document.getElementById('btnCancelar').addEventListener('click', hideForm);
+
+document.getElementById('btnGuardar').addEventListener('click', async () => {
+    const id    = document.getElementById('cliId').value;
+    const name  = document.getElementById('cliName').value.trim();
+    const email = document.getElementById('cliEmail').value.trim();
+    if (!name || !email) { toast('Nombre y correo son obligatorios', 'err'); return; }
+
+    const payload = { name, email, phone: document.getElementById('cliPhone').value.trim() };
+    const res = id
+        ? await apiFetch(`/clients/${id}`, { method: 'PUT',  body: payload })
+        : await apiFetch('/clients',        { method: 'POST', body: payload });
+
+    if (res && res.ok) {
+        toast(id ? '✅ Cliente actualizado' : '✅ Cliente registrado', 'ok');
+        hideForm();
+        loadClients();
+    } else {
+        toast('❌ ' + (res?.data?.error || 'Error al guardar'), 'err');
+    }
+});
+
+function editarCli(id) {
+    const c = allClients.find(x => x.id === id);
+    if (!c) return;
+    document.getElementById('cliId').value    = c.id;
+    document.getElementById('cliName').value  = c.name;
+    document.getElementById('cliEmail').value = c.email;
+    document.getElementById('cliPhone').value = c.phone || '';
+    showForm('Editar cliente');
+}
+
+async function eliminarCli(id, nombre) {
+    if (!confirm(`¿Eliminar a "${nombre}"? También se eliminarán sus ventas.`)) return;
+    const res = await fetch(`${API}/clients/${id}`, { method: 'DELETE' });
+    if (res.ok) { toast('🗑 Cliente eliminado', 'ok'); loadClients(); }
+    else toast('❌ Error al eliminar', 'err');
+}
+
+document.addEventListener('DOMContentLoaded', loadClients);
+</script>
+</body>
+</html>

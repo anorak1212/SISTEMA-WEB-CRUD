@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SysStore — Ventas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav class="sidebar" id="sidebar"></nav>
+
+<main class="content">
+
+    <header class="page-header">
+        <div>
+            <h1 class="page-title">Registro de Ventas</h1>
+            <p class="page-sub" id="subCount">Cargando…</p>
+        </div>
+    </header>
+
+    <!-- Formulario nueva venta -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">💳 Nueva venta</span>
+        </div>
+        <div class="form-grid">
+            <div class="form-group">
+                <label class="form-label">Cliente *</label>
+                <select class="form-control" id="saleClient">
+                    <option value="">— Selecciona cliente —</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Artículo *</label>
+                <select class="form-control" id="saleArticle">
+                    <option value="">— Selecciona artículo —</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label class="form-label">Cantidad *</label>
+                <input class="form-control" type="number" id="saleQty" value="1" min="1" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Total estimado</label>
+                <input class="form-control" type="text" id="saleTotal" readonly placeholder="Se calcula automáticamente" />
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" id="btnVenta">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                    <polyline points="20 6 9 17 4 12"/>
+                </svg>
+                Registrar venta
+            </button>
+            <button class="btn btn-ghost" id="btnLimpiar">Limpiar</button>
+        </div>
+    </div>
+
+    <!-- Historial -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">📋 Historial de ventas</span>
+            <span class="td-muted" style="font-size:.78rem" id="totalInfo"></span>
+        </div>
+        <div class="filters-bar">
+            <input class="form-control filter-search" type="text" id="searchSales" placeholder="Buscar por cliente o artículo…" />
+        </div>
+        <div class="table-wrap">
+            <table class="table">
+                <thead><tr>
+                    <th>Cliente</th><th>Artículo</th><th>Precio Unit.</th>
+                    <th>Cantidad</th><th>Total</th><th>Fecha</th><th>Acciones</th>
+                </tr></thead>
+                <tbody id="tbodySales"></tbody>
+            </table>
+        </div>
+    </div>
+
+</main>
+
+<script src="shared.js"></script>
+<script>
+requireAuth();
+injectNav('ventas');
+
+let allSales    = [];
+let allArticles = [];
+let allClients  = [];
+
+async function loadAll() {
+    const [rS, rA, rC] = await Promise.all([
+        fetch(`${API}/sales`).then(r => r.json()),
+        fetch(`${API}/articles`).then(r => r.json()),
+        fetch(`${API}/clients`).then(r => r.json()),
+    ]);
+    allSales    = rS;
+    allArticles = rA;
+    allClients  = rC;
+
+    // Llenar selects
+    const selCli = document.getElementById('saleClient');
+    const selArt = document.getElementById('saleArticle');
+    const curCli = selCli.value;
+    const curArt = selArt.value;
+
+    selCli.innerHTML = '<option value="">— Selecciona cliente —</option>' +
+        rC.map(c => `<option value="${c.id}">${esc(c.name)}</option>`).join('');
+
+    selArt.innerHTML = '<option value="">— Selecciona artículo —</option>' +
+        rA.filter(a => a.stock > 0).map(a =>
+            `<option value="${a.id}" data-price="${a.price}">${esc(a.name)} — ${fmtMoney(a.price)} (stock: ${a.stock})</option>`
+        ).join('');
+
+    if (curCli) selCli.value = curCli;
+    if (curArt) selArt.value = curArt;
+
+    renderSales(allSales);
+
+    const total = allSales.reduce((s, v) => s + v.total, 0);
+    document.getElementById('subCount').textContent =
+        `${allSales.length} venta${allSales.length !== 1 ? 's' : ''} registrada${allSales.length !== 1 ? 's' : ''}`;
+    document.getElementById('totalInfo').textContent =
+        `Total acumulado: ${fmtMoney(total)}`;
+}
+
+/* ─── RENDER TABLE ─────────────── */
+function renderSales(data) {
+    const tbody = document.getElementById('tbodySales');
+    if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No hay ventas registradas.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = data.map(v => `
+        <tr>
+            <td class="td-nombre">${esc(v.client_name)}</td>
+            <td>${esc(v.article_name)}</td>
+            <td class="td-muted">${fmtMoney(v.article_price)}</td>
+            <td><span class="chip-id">${v.quantity}</span></td>
+            <td class="td-precio"><strong>${fmtMoney(v.total)}</strong></td>
+            <td class="td-muted">${fmtDate(v.date)}</td>
+            <td class="row-actions">
+                <button class="btn-row btn-row--del" onclick="cancelarVenta('${v.id}')">Cancelar</button>
+            </td>
+        </tr>`).join('');
+}
+
+/* ─── CALCULAR TOTAL ───────────── */
+function calcTotal() {
+    const sel   = document.getElementById('saleArticle');
+    const opt   = sel.options[sel.selectedIndex];
+    const price = parseFloat(opt?.dataset?.price || 0);
+    const qty   = parseInt(document.getElementById('saleQty').value || 1);
+    document.getElementById('saleTotal').value = price ? fmtMoney(price * qty) : '';
+}
+document.getElementById('saleArticle').addEventListener('change', calcTotal);
+document.getElementById('saleQty').addEventListener('input', calcTotal);
+
+/* ─── NUEVA VENTA ──────────────── */
+document.getElementById('btnVenta').addEventListener('click', async () => {
+    const cid = document.getElementById('saleClient').value;
+    const aid = document.getElementById('saleArticle').value;
+    const qty = parseInt(document.getElementById('saleQty').value);
+    if (!cid || !aid || !qty || qty < 1) { toast('Completa todos los campos', 'err'); return; }
+
+    const res = await apiFetch('/sales', {
+        method: 'POST',
+        body: { client_id: cid, article_id: aid, quantity: qty }
+    });
+
+    if (res && res.ok) {
+        toast('✅ Venta registrada correctamente', 'ok');
+        document.getElementById('saleClient').value  = '';
+        document.getElementById('saleArticle').value = '';
+        document.getElementById('saleQty').value     = '1';
+        document.getElementById('saleTotal').value   = '';
+        loadAll();
+    } else {
+        const msg = res?.data?.error || 'Error al registrar venta';
+        toast('❌ ' + msg, 'err');
+    }
+});
+
+document.getElementById('btnLimpiar').addEventListener('click', () => {
+    document.getElementById('saleClient').value  = '';
+    document.getElementById('saleArticle').value = '';
+    document.getElementById('saleQty').value     = '1';
+    document.getElementById('saleTotal').value   = '';
+});
+
+/* ─── CANCELAR VENTA ───────────── */
+async function cancelarVenta(id) {
+    if (!confirm('¿Cancelar esta venta? El stock del artículo será restaurado.')) return;
+    const res = await fetch(`${API}/sales/${id}`, { method: 'DELETE' });
+    if (res.ok) { toast('🗑 Venta cancelada y stock restaurado', 'ok'); loadAll(); }
+    else toast('❌ Error al cancelar', 'err');
+}
+
+/* ─── BUSCAR ───────────────────── */
+document.getElementById('searchSales').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    renderSales(allSales.filter(v =>
+        v.client_name.toLowerCase().includes(q) ||
+        v.article_name.toLowerCase().includes(q)
+    ));
+});
+
+document.addEventListener('DOMContentLoaded', loadAll);
+</script>
+
+</body>
+</html>

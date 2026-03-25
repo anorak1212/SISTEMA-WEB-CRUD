@@ -1,40 +1,60 @@
 services:
+
   db:
-    image: postgres:15
+    image: postgres:15-alpine
+    container_name: sysstore_db
     environment:
-      POSTGRES_USER: admin
+      POSTGRES_USER:     admin
       POSTGRES_PASSWORD: secretpassword
-      POSTGRES_DB: store_db
+      POSTGRES_DB:       store_db
     volumes:
       - pgdata:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/01_seed.sql:ro
     networks:
       - backend_net
-    restart: always
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d store_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   api:
-    build: ./backend
+    build:
+      context:    ./backend
+      dockerfile: Dockerfile
+    container_name: sysstore_api
     ports:
       - "5000:5000"
     environment:
       DATABASE_URL: postgresql://admin:secretpassword@db:5432/store_db
+      FLASK_ENV:    production
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - backend_net
       - frontend_net
-    restart: always
-
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/articles || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      
   frontend:
     image: nginx:alpine
+    container_name: sysstore_frontend
     ports:
       - "80:80"
     volumes:
       - ./frontend:/usr/share/nginx/html:ro
     depends_on:
-      - api
+      api:
+        condition: service_healthy
     networks:
       - frontend_net
-    restart: always
+    restart: unless-stopped
 
 networks:
   backend_net:
@@ -44,3 +64,4 @@ networks:
 
 volumes:
   pgdata:
+    name: sysstore_pgdata

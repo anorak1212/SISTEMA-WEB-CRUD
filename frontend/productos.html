@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SysStore — Catálogo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav class="sidebar" id="sidebar"></nav>
+
+<main class="content">
+
+    <header class="page-header">
+        <div>
+            <h1 class="page-title">Catálogo de Artículos</h1>
+            <p class="page-sub" id="subCount">Cargando…</p>
+        </div>
+        <button class="btn btn-primary" id="btnNuevo">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Nuevo artículo
+        </button>
+    </header>
+
+    <!-- Formulario -->
+    <div class="card" id="formCard" style="display:none;">
+        <div class="card-header">
+            <span class="card-title" id="formTitle">➕ Nuevo artículo</span>
+        </div>
+        <div class="form-grid">
+            <input type="hidden" id="artId" />
+            <div class="form-group">
+                <label class="form-label">Nombre *</label>
+                <input class="form-control" type="text" id="artName" placeholder="Ej: Laptop Lenovo" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Precio *</label>
+                <input class="form-control" type="number" id="artPrice" step="0.01" min="0" placeholder="0.00" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Descripción</label>
+                <input class="form-control" type="text" id="artDesc" placeholder="Descripción breve" />
+            </div>
+            <div class="form-group">
+                <label class="form-label">Stock</label>
+                <input class="form-control" type="number" id="artStock" value="0" min="0" />
+            </div>
+        </div>
+        <div class="form-actions">
+            <button class="btn btn-primary" id="btnGuardar">💾 Guardar</button>
+            <button class="btn btn-ghost" id="btnCancelar">✖ Cancelar</button>
+        </div>
+    </div>
+
+    <!-- Tabla -->
+    <div class="card">
+        <div class="filters-bar">
+            <input class="form-control filter-search" type="text" id="searchInput" placeholder="Buscar por nombre o descripción…" />
+        </div>
+        <div class="table-wrap">
+            <table class="table">
+                <thead><tr>
+                    <th>ID</th><th>Nombre</th><th>Descripción</th>
+                    <th>Precio</th><th>Stock</th><th>Fecha Alta</th><th>Acciones</th>
+                </tr></thead>
+                <tbody id="tbodyArt"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Detalle de UN artículo -->
+    <div class="modal-overlay" id="modalDetalle">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">📦 Detalle del artículo</span>
+                <button class="modal-close" id="btnCerrarModal">✕</button>
+            </div>
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+</main>
+
+<script src="shared.js"></script>
+<script>
+requireAuth();
+injectNav('productos');
+
+let allArticles = [];
+
+/* ─── LOAD ─────────────────────── */
+async function loadArticles() {
+    const r = await fetch(`${API}/articles`);
+    allArticles = await r.json();
+    renderTable(allArticles);
+    document.getElementById('subCount').textContent =
+        `${allArticles.length} artículo${allArticles.length !== 1 ? 's' : ''} registrado${allArticles.length !== 1 ? 's' : ''}`;
+}
+
+function renderTable(data) {
+    const tbody = document.getElementById('tbodyArt');
+    if (!data.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No hay artículos registrados.</td></tr>';
+        return;
+    }
+    tbody.innerHTML = data.map(a => `
+        <tr>
+            <td><span class="chip-id">${esc(a.id.slice(0,8))}…</span></td>
+            <td class="td-nombre">${esc(a.name)}</td>
+            <td class="td-muted">${esc(a.description || '—')}</td>
+            <td class="td-precio">${fmtMoney(a.price)}</td>
+            <td><span class="chip-stock ${a.stock===0?'stock-empty':a.stock<=5?'stock-low':''}">${a.stock} pzs</span></td>
+            <td class="td-muted">${fmtDate(a.created_at)}</td>
+            <td class="row-actions">
+                <button class="btn-row btn-row--view" onclick="verDetalle('${a.id}')">Ver</button>
+                <button class="btn-row btn-row--edit" onclick="editarArt('${a.id}')">Editar</button>
+                <button class="btn-row btn-row--del"  onclick="eliminarArt('${a.id}', '${esc(a.name)}')">Eliminar</button>
+            </td>
+        </tr>`).join('');
+}
+
+/* ─── SEARCH ───────────────────── */
+document.getElementById('searchInput').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    renderTable(allArticles.filter(a =>
+        a.name.toLowerCase().includes(q) || (a.description||'').toLowerCase().includes(q)
+    ));
+});
+
+/* ─── FORM SHOW/HIDE ───────────── */
+function showForm(titulo) {
+    document.getElementById('formCard').style.display = 'block';
+    document.getElementById('formTitle').textContent = titulo;
+    document.getElementById('formCard').scrollIntoView({ behavior: 'smooth' });
+}
+
+function hideForm() {
+    document.getElementById('formCard').style.display = 'none';
+    document.getElementById('artId').value    = '';
+    document.getElementById('artName').value  = '';
+    document.getElementById('artPrice').value = '';
+    document.getElementById('artDesc').value  = '';
+    document.getElementById('artStock').value = '0';
+}
+
+document.getElementById('btnNuevo').addEventListener('click', () => {
+    hideForm();
+    showForm('➕ Nuevo artículo');
+});
+
+document.getElementById('btnCancelar').addEventListener('click', hideForm);
+
+/* ─── SAVE ─────────────────────── */
+document.getElementById('btnGuardar').addEventListener('click', async () => {
+    const id    = document.getElementById('artId').value;
+    const name  = document.getElementById('artName').value.trim();
+    const price = parseFloat(document.getElementById('artPrice').value);
+    if (!name || isNaN(price)) { toast('Nombre y precio son obligatorios', 'err'); return; }
+
+    const payload = {
+        name,
+        price,
+        description: document.getElementById('artDesc').value.trim(),
+        stock: parseInt(document.getElementById('artStock').value) || 0
+    };
+
+    const res = id
+        ? await apiFetch(`/articles/${id}`, { method: 'PUT', body: payload })
+        : await apiFetch('/articles',        { method: 'POST', body: payload });
+
+    if (res && res.ok) {
+        toast(id ? '✅ Artículo actualizado' : '✅ Artículo creado', 'ok');
+        hideForm();
+        loadArticles();
+    } else {
+        toast('❌ Error al guardar', 'err');
+    }
+});
+
+/* ─── EDIT ─────────────────────── */
+function editarArt(id) {
+    const a = allArticles.find(x => x.id === id);
+    if (!a) return;
+    document.getElementById('artId').value    = a.id;
+    document.getElementById('artName').value  = a.name;
+    document.getElementById('artPrice').value = a.price;
+    document.getElementById('artDesc').value  = a.description || '';
+    document.getElementById('artStock').value = a.stock;
+    showForm('✏️ Editar artículo');
+}
+
+/* ─── DELETE ───────────────────── */
+async function eliminarArt(id, nombre) {
+    if (!confirm(`¿Eliminar "${nombre}"?`)) return;
+    const res = await fetch(`${API}/articles/${id}`, { method: 'DELETE' });
+    if (res.ok) { toast('🗑 Artículo eliminado', 'ok'); loadArticles(); }
+    else toast('❌ Error al eliminar', 'err');
+}
+
+/* ─── DETALLE ──────────────────── */
+async function verDetalle(id) {
+    const r = await apiFetch(`/articles/${id}`);
+    if (!r || !r.ok) return;
+    const a = r.data;
+    document.getElementById('modalBody').innerHTML = `
+        <div class="detail-row"><span class="detail-label">Nombre</span><span class="detail-value">${esc(a.name)}</span></div>
+        <div class="detail-row"><span class="detail-label">Precio</span><span class="detail-value td-precio">${fmtMoney(a.price)}</span></div>
+        <div class="detail-row"><span class="detail-label">Descripción</span><span class="detail-value">${esc(a.description||'—')}</span></div>
+        <div class="detail-row"><span class="detail-label">Stock</span>
+            <span class="detail-value"><span class="chip-stock ${a.stock===0?'stock-empty':a.stock<=5?'stock-low':''}">${a.stock} piezas</span></span></div>
+        <div class="detail-row"><span class="detail-label">Fecha de alta</span><span class="detail-value">${fmtDate(a.created_at)}</span></div>
+        <div class="detail-row"><span class="detail-label">ID completo</span><span class="detail-value td-muted" style="font-size:.75rem;word-break:break-all">${a.id}</span></div>
+    `;
+    document.getElementById('modalDetalle').classList.add('open');
+}
+
+document.getElementById('btnCerrarModal').addEventListener('click', () =>
+    document.getElementById('modalDetalle').classList.remove('open'));
+document.getElementById('modalDetalle').addEventListener('click', e => {
+    if (e.target === document.getElementById('modalDetalle'))
+        document.getElementById('modalDetalle').classList.remove('open');
+});
+
+document.addEventListener('DOMContentLoaded', loadArticles);
+</script>
+
+<style>
+.modal-overlay { position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:500;opacity:0;pointer-events:none;transition:opacity .2s; }
+.modal-overlay.open { opacity:1;pointer-events:all; }
+.modal { background:#fff;border-radius:14px;box-shadow:0 4px 20px rgba(37,51,64,.14);width:100%;max-width:460px;max-height:90vh;overflow-y:auto; }
+.modal-header { display:flex;justify-content:space-between;align-items:center;padding:1.1rem 1.4rem;border-bottom:1px solid var(--border); }
+.modal-title { font-family:'Comfortaa',cursive;font-size:1rem;color:var(--navy);font-weight:700; }
+.modal-close { background:none;border:none;cursor:pointer;color:var(--muted);font-size:1.2rem;padding:.2rem .4rem;border-radius:4px; }
+.modal-close:hover { background:var(--bg); }
+.modal-body { padding:1.4rem; }
+.detail-row { display:flex;gap:1rem;margin-bottom:.75rem;flex-wrap:wrap; }
+.detail-label { font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;min-width:110px; }
+.detail-value { font-size:.87rem;color:var(--text);font-weight:500; }
+</style>
+
+</body>
+</html>

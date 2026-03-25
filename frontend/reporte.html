@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SysStore — Reporte</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<nav class="sidebar" id="sidebar"></nav>
+
+<main class="content">
+
+    <header class="page-header">
+        <div>
+            <h1 class="page-title">Reporte de Clientes</h1>
+            <p class="page-sub">Clientes dados de alta y el detalle de sus compras</p>
+        </div>
+        <button class="btn btn-primary" id="btnRefresh">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <polyline points="23 4 23 10 17 10"/>
+                <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/>
+            </svg>
+            Actualizar
+        </button>
+    </header>
+
+    <!-- Resumen rápido -->
+    <div class="stats-grid" id="reportStats">
+        <div class="stat-card"><div class="stat-icon si-teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><div class="stat-body"><span class="stat-label">Total clientes</span><span class="stat-value" id="rTotal">—</span></div></div>
+        <div class="stat-card"><div class="stat-icon si-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div><div class="stat-body"><span class="stat-label">Total compras</span><span class="stat-value" id="rCompras">—</span></div></div>
+        <div class="stat-card"><div class="stat-icon si-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div class="stat-body"><span class="stat-label">Total vendido</span><span class="stat-value" id="rVendido">—</span></div></div>
+        <div class="stat-card"><div class="stat-icon si-yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><div class="stat-body"><span class="stat-label">Promedio por cliente</span><span class="stat-value" id="rPromedio">—</span></div></div>
+    </div>
+
+    <!-- Filtro -->
+    <div style="margin-bottom:1.25rem;">
+        <input class="form-control" type="text" id="searchReport"
+               style="max-width:320px;" placeholder="Buscar cliente…" />
+    </div>
+
+    <!-- Cards de clientes -->
+    <div class="report-grid" id="reportGrid">
+        <div class="empty-state">Cargando reporte…</div>
+    </div>
+
+</main>
+
+<script src="shared.js"></script>
+<script>
+requireAuth();
+injectNav('reporte');
+
+let reportData = [];
+
+async function loadReport() {
+    document.getElementById('reportGrid').innerHTML = '<div class="empty-state">Cargando reporte…</div>';
+    const r = await apiFetch('/report');
+    if (!r || !r.ok) {
+        document.getElementById('reportGrid').innerHTML = '<div class="empty-state">Error al cargar el reporte.</div>';
+        return;
+    }
+    reportData = r.data;
+    renderStats(reportData);
+    renderCards(reportData);
+}
+
+function renderStats(data) {
+    const totalCompras = data.reduce((s, c) => s + c.total_purchases, 0);
+    const totalVendido = data.reduce((s, c) => s + c.total_spent, 0);
+    const promedio     = data.length ? totalVendido / data.length : 0;
+
+    document.getElementById('rTotal').textContent   = data.length;
+    document.getElementById('rCompras').textContent = totalCompras;
+    document.getElementById('rVendido').textContent = fmtMoney(totalVendido);
+    document.getElementById('rPromedio').textContent= fmtMoney(promedio);
+}
+
+function renderCards(data) {
+    const grid = document.getElementById('reportGrid');
+    if (!data.length) {
+        grid.innerHTML = '<div class="empty-state">No hay clientes registrados.</div>';
+        return;
+    }
+
+    grid.innerHTML = data.map(c => `
+        <div class="report-card">
+            <div class="report-card-header">
+                <div>
+                    <span class="rc-name">👤 ${esc(c.name)}</span>
+                    <span class="rc-email">✉ ${esc(c.email)}</span>
+                    ${c.phone ? `<span class="rc-phone">📞 ${esc(c.phone)}</span>` : ''}
+                    <span class="rc-email">📅 Alta: ${fmtDate(c.registered_at)}</span>
+                </div>
+                <div class="rc-stats">
+                    <span class="rc-badge rc-badge-blue">🛒 ${c.total_purchases} compra${c.total_purchases!==1?'s':''}</span>
+                    <span class="rc-badge rc-badge-green">💰 ${fmtMoney(c.total_spent)}</span>
+                </div>
+            </div>
+            <div class="report-card-body">
+                ${c.purchases.length ? `
+                <table class="inner-table">
+                    <thead><tr>
+                        <th>Artículo</th><th>Cantidad</th><th>Total</th><th>Fecha</th>
+                    </tr></thead>
+                    <tbody>
+                        ${c.purchases.map(p => `
+                        <tr>
+                            <td>${esc(p.article)}</td>
+                            <td>${p.quantity}</td>
+                            <td class="td-precio">${fmtMoney(p.total)}</td>
+                            <td>${fmtDate(p.date)}</td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>` : '<p class="no-purchases">Este cliente aún no ha realizado compras.</p>'}
+            </div>
+        </div>`).join('');
+}
+
+document.getElementById('searchReport').addEventListener('input', e => {
+    const q = e.target.value.toLowerCase();
+    renderCards(reportData.filter(c =>
+        c.name.toLowerCase().includes(q) || c.email.toLowerCase().includes(q)
+    ));
+});
+
+document.getElementById('btnRefresh').addEventListener('click', loadReport);
+document.addEventListener('DOMContentLoaded', loadReport);
+</script>
+
+</body>
+</html>

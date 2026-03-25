@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SysStore — Iniciar sesión</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+<body class="login-body">
+
+    <div class="login-card">
+        <div class="login-logo">
+            <span class="login-name">SysStore</span>
+            <span class="login-sub">Sistema de Punto de Venta &mdash; UAEMEX FIC</span>
+        </div>
+
+        <div class="login-err" id="loginErr">Usuario o contraseña incorrectos.</div>
+
+        <div class="login-field">
+            <label class="login-label" for="loginUser">Usuario</label>
+            <input class="login-input" type="text" id="loginUser"
+                   placeholder="admin" autocomplete="username" />
+        </div>
+        <div class="login-field">
+            <label class="login-label" for="loginPass">Contraseña</label>
+            <input class="login-input" type="password" id="loginPass"
+                   placeholder="••••••••" autocomplete="current-password" />
+        </div>
+
+        <button class="login-btn" id="loginBtn">Iniciar sesión</button>
+        
+    </div>
+
+    <script>
+        if (localStorage.getItem('ss_logged')) window.location.href = 'index.html';
+
+        const USERS = { admin: 'admin123', mateo: 'tci2026' };
+
+        function doLogin() {
+            const user = document.getElementById('loginUser').value.trim();
+            const pass = document.getElementById('loginPass').value;
+            const err  = document.getElementById('loginErr');
+            if (USERS[user] && USERS[user] === pass) {
+                localStorage.setItem('ss_logged', '1');
+                localStorage.setItem('ss_user', user);
+                window.location.href = 'index.html';
+            } else {
+                err.classList.add('show');
+                document.getElementById('loginPass').value = '';
+                document.getElementById('loginPass').focus();
+            }
+        }
+
+        document.getElementById('loginBtn').addEventListener('click', doLogin);
+        document.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+    </script>
+</body>
+</html>

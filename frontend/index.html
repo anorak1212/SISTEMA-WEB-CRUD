@@ -1,51 +1,124 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestión de Tienda Local</title>
-    <link rel="stylesheet" href="style.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SysStore — Panel de control</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <div class="container">
-        <h1>Gestión de Artículos</h1>
-        
-        <div class="form-container">
-            <form id="articleForm">
-                <input type="hidden" id="articleId">
-                
-                <label for="name">Nombre:</label>
-                <input type="text" id="name" required>
-                
-                <label for="price">Precio:</label>
-                <input type="number" id="price" step="0.01" required>
-                
-                <label for="description">Descripción:</label>
-                <input type="text" id="description">
-                
-                <label for="stock">Stock:</label>
-                <input type="number" id="stock" value="0">
-                
-                <button type="submit" id="submitBtn">Guardar Artículo</button>
-                <button type="button" id="cancelBtn" class="btn-cancel" style="display: none;">Cancelar</button>
-            </form>
-        </div>
 
-        <table id="articlesTable">
-            <thead>
-                <tr>
-                    <th>Nombre</th>
-                    <th>Precio</th>
-                    <th>Descripción</th>
-                    <th>Stock</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                </tbody>
-        </table>
+<nav class="sidebar" id="sidebar"></nav>
+
+<main class="content">
+    <header class="page-header">
+        <div>
+            <h1 class="page-title">Panel de control</h1>
+            <p class="page-sub">Resumen general del sistema</p>
+        </div>
+        <a href="productos.html" class="btn btn-primary">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Agregar producto
+        </a>
+    </header>
+
+    <!-- Stats -->
+    <div class="stats-grid" id="statsGrid">
+        <div class="stat-card"><div class="stat-icon si-blue"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div><div class="stat-body"><span class="stat-label">Artículos</span><span class="stat-value" id="sTotal">—</span></div></div>
+        <div class="stat-card"><div class="stat-icon si-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div><div class="stat-body"><span class="stat-label">Valor inventario</span><span class="stat-value" id="sValor">—</span></div></div>
+        <div class="stat-card"><div class="stat-icon si-teal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div><div class="stat-body"><span class="stat-label">Clientes</span><span class="stat-value" id="sClientes">—</span></div></div>
+        <div class="stat-card"><div class="stat-icon si-yellow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg></div><div class="stat-body"><span class="stat-label">Ventas totales</span><span class="stat-value" id="sVentas">—</span></div></div>
+        <div class="stat-card stat-card--warn" id="statSinStock"><div class="stat-icon si-warn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><div class="stat-body"><span class="stat-label">Sin stock</span><span class="stat-value" id="sSinStock">—</span></div></div>
+        <div class="stat-card"><div class="stat-icon si-green"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg></div><div class="stat-body"><span class="stat-label">Total vendido</span><span class="stat-value" id="sTotalVendido">—</span></div></div>
     </div>
 
-    <script src="app.js"></script>
+    <!-- Últimos artículos -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Artículos recientes</span>
+            <a href="productos.html" class="link-all">Ver catálogo completo →</a>
+        </div>
+        <div class="table-wrap">
+            <table class="table" id="tblRecientes">
+                <thead><tr>
+                    <th>ID</th><th>Nombre</th><th>Precio</th><th>Stock</th><th>Acciones</th>
+                </tr></thead>
+                <tbody id="tbodyRecientes"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Ventas recientes -->
+    <div class="card">
+        <div class="card-header">
+            <span class="card-title">Ventas recientes</span>
+            <a href="ventas.html" class="link-all">Ver historial →</a>
+        </div>
+        <div class="table-wrap">
+            <table class="table">
+                <thead><tr>
+                    <th>Cliente</th><th>Artículo</th><th>Total</th><th>Fecha</th>
+                </tr></thead>
+                <tbody id="tbodyVentasRecientes"></tbody>
+            </table>
+        </div>
+    </div>
+</main>
+
+<script src="shared.js"></script>
+<script>
+requireAuth();
+injectNav('index');
+
+async function loadDashboard() {
+    const [rArt, rCli, rSales] = await Promise.all([
+        fetch(`${API}/articles`).then(r => r.json()),
+        fetch(`${API}/clients`).then(r => r.json()),
+        fetch(`${API}/sales`).then(r => r.json()),
+    ]);
+
+    const sinStock   = rArt.filter(a => a.stock === 0).length;
+    const valorInv   = rArt.reduce((s, a) => s + a.price * a.stock, 0);
+    const totalVend  = rSales.reduce((s, v) => s + v.total, 0);
+
+    document.getElementById('sTotal').textContent      = rArt.length;
+    document.getElementById('sValor').textContent      = fmtMoney(valorInv);
+    document.getElementById('sClientes').textContent   = rCli.length;
+    document.getElementById('sVentas').textContent     = rSales.length;
+    document.getElementById('sSinStock').textContent   = sinStock;
+    document.getElementById('sTotalVendido').textContent = fmtMoney(totalVend);
+
+    // artículos recientes
+    const tbody = document.getElementById('tbodyRecientes');
+    const ultimos = [...rArt].reverse().slice(0, 6);
+    tbody.innerHTML = ultimos.length ? ultimos.map(a => `
+        <tr>
+            <td><span class="chip-id">${esc(a.id.slice(0,8))}</span></td>
+            <td class="td-nombre">${esc(a.name)}</td>
+            <td class="td-precio">${fmtMoney(a.price)}</td>
+            <td><span class="chip-stock ${a.stock===0?'stock-empty':a.stock<=5?'stock-low':''}">${a.stock} pzs</span></td>
+            <td class="row-actions">
+                <a href="productos.html" class="btn-row btn-row--edit">Editar</a>
+            </td>
+        </tr>`).join('') : '<tr><td colspan="5" class="empty-state">Sin artículos.</td></tr>';
+
+    // ventas recientes
+    const tbodyV = document.getElementById('tbodyVentasRecientes');
+    const ultVentas = rSales.slice(0, 5);
+    tbodyV.innerHTML = ultVentas.length ? ultVentas.map(v => `
+        <tr>
+            <td class="td-nombre">${esc(v.client_name)}</td>
+            <td>${esc(v.article_name)}</td>
+            <td class="td-precio">${fmtMoney(v.total)}</td>
+            <td class="td-muted">${fmtDate(v.date)}</td>
+        </tr>`).join('') : '<tr><td colspan="4" class="empty-state">Sin ventas.</td></tr>';
+}
+
+document.addEventListener('DOMContentLoaded', loadDashboard);
+</script>
 </body>
 </html>
